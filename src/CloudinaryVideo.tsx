@@ -38,6 +38,7 @@ const getEnd = (start: number, chunkSize: number, size: number) => {
 
 const useVideo = (src?: string) => {
   const [url, setURL] = useState<string>();
+  const [mediaSource] = useState(new MediaSource());
 
   useEffect(() => {
     if (!src) return;
@@ -48,12 +49,11 @@ const useVideo = (src?: string) => {
       let start = 0;
       let end = getEnd(start, chunkSize, size);
 
-      const mediaSource = new MediaSource();
       setURL(window.URL.createObjectURL(mediaSource));
       mediaSource.addEventListener("sourceopen", () => {
         const sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
         sourceBuffer.addEventListener("updateend", () => {
-          if (end !== size - 1) {
+          if (end < size - 1) {
             start = end + 1;
             end = getEnd(start, chunkSize, size);
             loadBuffer(src, sourceBuffer, start, end);
@@ -63,6 +63,7 @@ const useVideo = (src?: string) => {
         loadBuffer(src, sourceBuffer, start, end);
       });
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
   return { url };
