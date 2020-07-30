@@ -5,8 +5,11 @@ type CloudinaryVideoProps = React.DetailedHTMLProps<
   HTMLVideoElement
 >;
 
-const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-const chunkSize = 1000000;
+// const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+// const mimeCodec = 'video/mp4; codecs="mp4a.40.2,avc1.64001f"';
+const mimeCodec =
+  'video/mp4; codecs="mp4a.40.2,avc1.64001f"; profiles="mp41,mp42,isom"';
+const chunkSize = 100000;
 
 const fetchVideoInfo = async (url: string) => {
   const { headers } = await fetch(url, { method: "HEAD" });
@@ -25,8 +28,12 @@ const loadBuffer = async (
     Range: `bytes=${start}-${end}`,
   });
 
+  console.log("start", start);
+  console.log("end", end);
+
   const response = await fetch(url, { headers });
   const data = await response.arrayBuffer();
+
   sourceBuffer.appendBuffer(data);
 };
 
@@ -42,6 +49,7 @@ const useVideo = (src?: string) => {
 
   useEffect(() => {
     if (!src) return;
+    let hasError = false;
 
     (async () => {
       const { headers } = await fetchVideoInfo(src);
@@ -53,16 +61,47 @@ const useVideo = (src?: string) => {
       mediaSource.addEventListener("sourceopen", () => {
         const sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
         sourceBuffer.addEventListener("updateend", () => {
-          if (end < size - 1) {
+          if (end < size - 1 && !hasError) {
             start = end + 1;
             end = getEnd(start, chunkSize, size);
             loadBuffer(src, sourceBuffer, start, end);
           }
         });
 
+        console.log("media SourceOpen");
+        sourceBuffer.addEventListener("updatestart", function (e) {
+          console.log("buffer UpdateStart: " + mediaSource.readyState);
+        });
+        sourceBuffer.addEventListener("update", function (e) {
+          console.log("buffer Update: " + mediaSource.readyState);
+        });
+        sourceBuffer.addEventListener("updateend", function (e) {
+          console.log("buffer UpdateEnd: " + mediaSource.readyState);
+        });
+        sourceBuffer.addEventListener("abort", function (e) {
+          console.log("buffer Abort: " + mediaSource.readyState);
+        });
+
+        sourceBuffer.addEventListener("error", (e) => {
+          console.log("buffer Error: " + mediaSource.readyState);
+          console.log(e);
+          hasError = true;
+        });
+
         loadBuffer(src, sourceBuffer, start, end);
       });
+      mediaSource.addEventListener("sourceended", (e) => {
+        console.log("media SourceEnded: " + mediaSource.readyState);
+      });
+      mediaSource.addEventListener("sourceclose", (e) => {
+        console.log("media SourceClose: " + mediaSource.readyState);
+      });
+      mediaSource.addEventListener("error", (e) => {
+        console.log("media Error: " + mediaSource.readyState);
+        hasError = true;
+      });
     })();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
